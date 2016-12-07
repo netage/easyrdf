@@ -1,5 +1,5 @@
 {
-    "name": "easyrdf/easyrdf",
+    "name": "netage/easyrdf",
     "description": "EasyRdf is a PHP library designed to make it easy to consume and produce RDF.",
     "version": "0.9.1",
     "type": "library",
