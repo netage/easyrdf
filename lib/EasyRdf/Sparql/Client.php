@@ -250,12 +250,51 @@ class EasyRdf_Sparql_Client
         );
         $client->setHeaders('Accept', $accept);
 
+        // check for auth info
+	    $uri_parts = parse_url($this->queryUri);
+	    if(isset($uri_parts['user']) && isset($uri_parts['pass']))
+		    $client->setHeaders('Authorization',
+                                'Basic '. base64_encode($uri_parts['user'].
+                                 ":".$uri_parts['pass']) );
+        
         if ($type == 'update') {
             $client->setMethod('POST');
             $client->setUri($this->updateUri);
             $client->setRawData($prefixes . $query);
             $client->setHeaders('Content-Type', 'application/sparql-update');
         } elseif ($type == 'query') {
+            $re = '(?:(?:\s*BASE\s*<.*?>\s*)|(?:\s*PREFIX\s+.+:\s*<.*?>\s*))*'.
+                  '(CONSTRUCT|SELECT|ASK|DESCRIBE)[\W]';
+            $result = null;
+            $matched = mb_eregi($re, $query, $result);
+            if (false === $matched or count($result) !== 2) {
+                // non-standard query. is this something non-standard?
+                $query_verb = null;
+            } else {
+                $query_verb = strtoupper($result[1]);
+            }
+            if ($query_verb === 'SELECT' or $query_verb === 'ASK') {
+                // only "results"
+                $accept = EasyRdf_Format::getHttpAcceptHeader(
+          		array(
+		              'application/sparql-results+json' => 1.0,
+		              'application/sparql-results+xml' => 0.8
+		            )
+	        );
+            } elseif ($query_verb === 'CONSTRUCT' or $query_verb === 'DESCRIBE') {
+                // only "graph"
+                $accept = EasyRdf_Format::getHttpAcceptHeader(array('text/turtle' => 1.0));
+
+            } else {
+                // both
+                $accept = EasyRdf_Format::getHttpAcceptHeader(
+          	    array(
+		            'application/sparql-results+json' => 1.0,
+    		        'application/sparql-results+xml' => 0.8
+	        	    ));
+            }
+      		
+	        $client->setHeaders('Accept', $accept);
             // Use GET if the query is less than 2kB
             // 2046 = 2kB minus 1 for '?' and 1 for NULL-terminated string on server
             $encodedQuery = 'query='.urlencode($prefixes . $query);
